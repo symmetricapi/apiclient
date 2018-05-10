@@ -347,6 +347,9 @@ def popup_callback_view(request):
     Also use localStorage with Android Chrome because the opener is null see:
         https://bugs.chromium.org/p/chromium/issues/detail?id=630770
         https://bugs.chromium.org/p/chromium/issues/detail?id=136610
+    Use setTimeout redirect for Android Browser because it doesn't actually do popups
+        - mainWindow is null because there is no parent window to talk to
+        - localStorage, postMessage, and window.close() will all do nothing
     From the opener script:
         The 'message' event listener can filter events with:
             var origin = location.origin || location.protocol + '//' + location.hostname + (location.port ? (':' + location.port) : '');
@@ -372,6 +375,7 @@ def popup_callback_view(request):
     else
         mainWindow.postMessage(getHashParameters(), targetOrigin);
     window.close();
+    setTimeout(function() { window.location.href = '%s'; }, 1000);
     </script>
     """
     # Post a message back to any window when debugging
@@ -384,12 +388,13 @@ def popup_callback_view(request):
     # If something overwrites window.name it could cause a problem though,
     # so it is not a perfect solution, so a bit of a hack
     allowed_origins = getattr(settings, 'API_CLIENT_ALLOWED_ORIGINS', None)
+    fallback_url = getattr(settings, 'API_CLIENT_POPUP_REDIRECT_FALLBACK', '/')
     if allowed_origins:
         allowed_origins = ["windowName === '%s'" % allowed for allowed in allowed_origins]
         allowed_origins = '||'.join(allowed_origins)
     else:
         allowed_origins = 'false'
-    return HttpResponse(js % (origin, allowed_origins))
+    return HttpResponse(js % (origin, allowed_origins, fallback_url))
 
 
 class AuthStorage(object):
