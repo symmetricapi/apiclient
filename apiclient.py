@@ -18,6 +18,7 @@ from django.shortcuts import redirect
 from django.core.urlresolvers import reverse
 from django.utils.http import urlencode
 from django.views.decorators.clickjacking import xframe_options_exempt
+from django.views.decorators.csrf import ensure_csrf_cookie
 import requests
 from requests.auth import AuthBase
 from requests_oauthlib import OAuth1
@@ -336,9 +337,13 @@ def popup_iframe_proxy(request):
     return HttpResponse(js)
 
 
+@ensure_csrf_cookie
 def popup_callback_view(request):
     """
     Handle front-end authorization or deauthorization inside a popup.
+    Include setting the csrf token because this popup may have been started from an embedded (as 3rd party) iframe where
+    the Set-Cookie header does not work until the user has clicked to open this and relax the security restrictions.
+
     Communicate through localStorage on IE due to too many postMessage bugs.
     The problem with localStorage events are:
         - Not cross-origin capable
