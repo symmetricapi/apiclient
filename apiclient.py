@@ -827,7 +827,7 @@ class ApiClient(object):
         """Create the authorization url for the user to visit. Override this to return a custom authorization url."""
         auth_url = cls.auth_spec.get('authorize_url', '')
         if auth_url and cls.auth_spec.get('mobile_authorization') and MOBILE_USER_AGENT_RE.search(request.META.get('HTTP_USER_AGENT', '')):
-            auth_url = auth_url.replace('//','//m.', 1)
+            auth_url = auth_url.replace('//www.','//', 1).replace('//','//m.', 1)
         if cls.auth_spec['type'] == ApiClientAuthType.OAUTH1:
             # OAuth1, use the request token url to get a request token
             response = requests.post(cls.auth_spec['request_token_url'], auth=cls.get_auth(callback_uri=callback_url))
