@@ -3,15 +3,13 @@ import json
 import logging
 import re
 try:
+    # Python 3
     from urllib.parse import quote
 except ImportError:
+    # Python 2
     from urllib import quote
 from urlparse import parse_qs
 
-from symmetric.functions import iso_8601_to_time, iso_8601_to_date, iso_8601_to_datetime, time_to_iso_8601, date_to_iso_8601, datetime_to_iso_8601, decode_int, decode_float, decode_bool, underscore_to_camel_case
-from symmetric.models import get_related_model
-from symmetric.response import render_data, render_error, set_response_headers
-from symmetric.views import ApiAction
 from django.conf import settings
 from django.db import models
 from django.http import HttpResponse
@@ -23,6 +21,21 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 import requests
 from requests.auth import AuthBase
 from requests_oauthlib import OAuth1
+from symmetric.functions import (
+    iso_8601_to_time,
+    iso_8601_to_date,
+    iso_8601_to_datetime,
+    time_to_iso_8601,
+    date_to_iso_8601,
+    datetime_to_iso_8601,
+    decode_int,
+    decode_float,
+    decode_bool,
+    underscore_to_camel_case,
+)
+from symmetric.models import get_related_model
+from symmetric.response import render_data, render_error, set_response_headers
+from symmetric.views import ApiAction
 
 
 """
@@ -270,7 +283,7 @@ class ApiClientMeta(type):
                             field = temp._meta.get_field(attr)
                             # Skip if a data field is found (loosely defined as having a default value of a dict)
                             # - default decoder and encoder should come up empty
-                            if isinstance(field.default, dict):
+                            if isinstance(callable(field.default) and field.default(), dict) or isinstance(field.default, dict):
                                 break
                             if hasattr(field, 'related'):
                                 temp = get_related_model(field)
@@ -523,7 +536,7 @@ class ApiClient(object):
             if type(internal) is tuple:
                 # Go straight to an data dictionary or recurse through a series of one or more foreign keys
                 if isinstance(getattr(obj, internal[0]), dict):
-                    setattr(getattr(obj, internal[0]), internal[1], value)
+                    obj[internal[0]][internal[1]] = value
                 else:
                     temp = obj
                     for attr in internal[:-1]:
