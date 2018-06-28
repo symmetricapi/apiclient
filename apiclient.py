@@ -1,6 +1,7 @@
 import inspect
 import json
 import logging
+import re
 try:
     from urllib.parse import quote
 except ImportError:
@@ -54,6 +55,9 @@ class rawdict(dict):
 
     def __delattr__(self, name):
         del self[name]
+
+
+MOBILE_USER_AGENT_RE = re.compile('iPhone|iPod|iPad|Android|Windows Phone', re.I)
 
 
 class ApiClientAuthType(object):
@@ -429,6 +433,7 @@ class ApiClient(object):
     consumer_secret - the app's consumer secret used for signing requests
     deauthorize_url - (optional) the deauthorize url to revoke access
     access_as_app - True if access can happen using app credentials
+    mobile_authorization - detect mobile user agents and use the m subdomain version of the authorize_url so that a mobile app does not handle the auth and lose the cookies
 
     OAuth2 Spec:
 
@@ -444,6 +449,7 @@ class ApiClient(object):
     access_token_as_data - place the access_token into the query string or body instead of the Authorization header, seems non-standard, maybe just something facebook does?
     deauthorize_url - (optional) the deauthorize url to revoke access
     access_as_app - True if access can happen using app credentials
+    mobile_authorization - detect mobile user agents and use the m subdomain version of the authorize_url so that a mobile app does not handle the auth and lose the cookies
 
     Notes on redirect_urls:
 
@@ -806,16 +812,19 @@ class ApiClient(object):
     @classmethod
     def get_auth_url(cls, request, callback_url, **kwargs):
         """Create the authorization url for the user to visit. Override this to return a custom authorization url."""
+        auth_url = cls.auth_spec.get('authorize_url', '')
+        if auth_url and cls.auth_spec.get('mobile_authorization') and MOBILE_USER_AGENT_RE.search(request.META.get('HTTP_USER_AGENT', '')):
+            auth_url = auth_url.replace('//','//m.', 1)
         if cls.auth_spec['type'] == ApiClientAuthType.OAUTH1:
             # OAuth1, use the request token url to get a request token
             response = requests.post(cls.auth_spec['request_token_url'], auth=cls.get_auth(callback_uri=callback_url))
             credentials = parse_qs(response.content)
             request.session[_Session.REQUEST_TOKEN] = credentials.get('oauth_token')[0]
             request.session[_Session.REQUEST_SECRET] = credentials.get('oauth_token_secret')[0]
-            return '%s?oauth_token=%s' % (cls.auth_spec['authorize_url'], urlquote(request.session[_Session.REQUEST_TOKEN]))
+            return '%s?oauth_token=%s' % (auth_url, urlquote(request.session[_Session.REQUEST_TOKEN]))
         if cls.auth_spec['type'] == ApiClientAuthType.OAUTH2:
             request.session[_Session.REDIRECT_URI] = callback_url
-            return '%s?client_id=%s&redirect_uri=%s&response_type=code&scope=%s' % (cls.auth_spec['authorize_url'], urlquote(cls.auth_spec['client_id']), urlquote(callback_url), urlquote(cls.auth_spec['scope']))
+            return '%s?client_id=%s&redirect_uri=%s&response_type=code&scope=%s' % (auth_url, urlquote(cls.auth_spec['client_id']), urlquote(callback_url), urlquote(cls.auth_spec['scope']))
         if cls.auth_spec['type'] == ApiClientAuthType.APIKEY:
             # There is no auth, just skip to the callback/setup
             return callback_url
