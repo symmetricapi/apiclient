@@ -536,7 +536,7 @@ class ApiClient(object):
             if type(internal) is tuple:
                 # Go straight to an data dictionary or recurse through a series of one or more foreign keys
                 if isinstance(getattr(obj, internal[0]), dict):
-                    obj[internal[0]][internal[1]] = value
+                    getattr(obj, internal[0])[internal[1]] = value
                 else:
                     temp = obj
                     for attr in internal[:-1]:
